@@ -27,10 +27,11 @@ int main(int argc, char** argv) {
     try {
       
         loRa.begin();
-        loRa.set_callback_RX(callback_Rx);
-        loRa.set_callback_TX(callback_Tx);
+        loRa.onRxDone(callback_Rx);
+        loRa.onTxDone(callback_Tx);
         loRa.continuous_receive(); // passsage en mode reception continue
-        sleep(60);
+        
+        sleep(5);
         loRa.send(buffer, 4);
         loRa.send("Bonjour le monde");
         
@@ -45,9 +46,9 @@ int main(int argc, char** argv) {
 }
 
 void callback_Rx(void) {
-    std::cout << "Rx done : " << loRa.bufferRX;
-    std::cout << " RSSI : " << loRa.rssi << "dBm";
-    std::cout << " SNR  : " << loRa.snr  << "dB" << std::endl; 
+    std::cout << "Rx done : " << loRa.payload();
+    std::cout << " RSSI : " << loRa.packetRssi() << "dBm";
+    std::cout << " SNR  : " << loRa.packetSnr()  << "dB" << std::endl; 
  
 }
 

@@ -142,22 +142,25 @@ class SX1278 {
     
 public:
     
-    SX1278(int channel = 0);
+    SX1278();
     SX1278(const SX1278& orig) = delete;
     virtual ~SX1278();
     
-    
-    void begin();
+    void setPins(int _channel, int _reset, int DIO_0);
+    void begin(double frequency = 433775000);
     void send(int8_t *buf, int8_t size);
     void send(const std::string &message);
     
     void continuous_receive();
-    void set_callback_RX(void (*ptrFuncRX)(void));
-    void set_callback_TX(void (*ptrFuncTX)(void));
+    void onRxDone(void (*ptrFuncRX)(void));
+    void onTxDone(void (*ptrFuncTX)(void));
     
-    int8_t bufferRX[257];  // Buffer de réception
-    int rssi;
-    float snr;
+    
+    std::string payload();
+    int packetRssi();
+    float packetSnr();
+    
+    
     
     
 private:
@@ -165,6 +168,7 @@ private:
     Spi *spi;
     int gpio_reset;        //raspberry GPIO pin connected to RESET pin of LoRa chip
     int gpio_DIO_0;        //raspberry GPIO pin connected to DIO0 pin of LoRa chip to detect TX and Rx done events. 
+    int channel;
     
     BandWidth bw;
     SpreadingFactor sf;    //only from SF7 to SF12. SF6 not support yet.
@@ -181,6 +185,10 @@ private:
         
     void (*callback_Rx)(void);  // pointeur sur une fonction callback utilisateur de type void(void)
     void (*callback_Tx)(void);
+    
+    int rssi;
+    float snr;
+    int8_t bufferRX[257];  // Buffer de réception
     
     void reset();
     

@@ -8,14 +8,14 @@
 #include "SX1278.h"
 
 /**
- * @brief Ouvre le bus SPI et 
- *        vérifie que le SX1278 est présent
- * @param channel le canal du bus
+ * @brief initialise les attributs 
+ * @param channel le canal du bus SPI 0 ou 1
  */
-SX1278::SX1278(int channel) :
-spi(new Spi(channel)),
+SX1278::SX1278() :
+spi(nullptr),
 gpio_reset(0),
 gpio_DIO_0(22),
+channel(0),
 bw(BW125),
 sf(SF12),
 ecr(CR5),
@@ -26,33 +26,53 @@ outPower(OP20),
 powerOutPin(PA_BOOST),
 ocp(240),
 callback_Rx(nullptr),
-callback_Tx(nullptr)
-
+callback_Tx(nullptr),
+rssi(0),
+snr(0.0)        
 {
-    // Lecture du registre de version 
-    int8_t value = spi->read_reg(0x42);
-    if (value != 0x12) {
-        throw std::runtime_error("Exception in constructor SX1278");
-    }
-    pinMode(gpio_reset, OUTPUT);
-
-    pinMode(gpio_DIO_0, INPUT);
-    // appelle de la fonction ISR_Function sur interruption au front montant de DIO_0
-    if (wiringPiISR(gpio_DIO_0, INT_EDGE_RISING, &ISR_TX_RX) < 0) {
-        throw std::runtime_error("Exception in constructor DIO_0");
-    }
-
+    std::memset(bufferRX, 0, sizeof(bufferRX));
 }
 
 SX1278::~SX1278() {
     if (spi != nullptr)
         delete spi;
 }
-/**
- * @brief methode pour initialiser le composant SX1278
- */
-void SX1278::begin() {
 
+/**
+ * @brief  Override the default NSS, RESET, and DIO0 pins used by the class. 
+ * Must be called before loRa.begin().
+ * @param _channel
+ * @param _reset
+ * @param DIO_0
+ */
+void SX1278::setPins(int _channel, int _reset, int DIO_0) {
+    channel = _channel;
+    gpio_reset = _reset;
+    gpio_DIO_0 = DIO_0;
+}
+
+/**
+ * @brief Initialize the chip SX1278 with the specified frequency.
+ * @param frequency in Hz
+ */
+void SX1278::begin(double frequency) {
+
+    spi = new Spi(channel);
+    // Lecture du registre de version 
+    int8_t value = spi->read_reg(0x42);
+    if (value != 0x12) {
+        throw std::runtime_error("Exception in begin SX1278");
+    }
+    pinMode(gpio_reset, OUTPUT);
+
+    pinMode(gpio_DIO_0, INPUT);
+    // appelle de la fonction ISR_Function sur interruption au front montant de DIO_0
+    if (wiringPiISR(gpio_DIO_0, INT_EDGE_RISING, &ISR_TX_RX) < 0) {
+        throw std::runtime_error("Exception in begin DIO_0");
+    }
+
+
+    freq = frequency;
     reset();
     set_lora_mode(); // configure la modulation mode LoRa
     set_explicit_header(); // configure l'entête explicite
@@ -67,16 +87,16 @@ void SX1278::begin() {
     set_agc(1); // On/Off AGC. If AGC is on, LNAGain not used
     //set_lna(G6, 0); // à creuser !!!
     set_ocp(ocp); // 45 to 240 mA. 0 to turn off protection
-    calculate_tsym();   // calcul du temps de symbole
-      
+    calculate_tsym(); // calcul du temps de symbole
+
     if ((tsym > 16))
         set_lowdatarateoptimize_on();
     else
         set_lowdatarateoptimize_off();
-    
+
     spi->write_reg(REG_FIFO_TX_BASE_ADDR, TX_BASE_ADDR);
     spi->write_reg(REG_FIFO_RX_BASE_ADDR, RX_BASE_ADDR);
-    
+
     spi->write_reg(REG_DETECT_OPTIMIZE, 0xc3); //LoRa Detection Optimize for SF > 6
     spi->write_reg(REG_DETECTION_THRESHOLD, 0x0a); //DetectionThreshold for SF > 6
 
@@ -91,19 +111,19 @@ void SX1278::begin() {
  */
 void SX1278::send(int8_t *buf, int8_t size) {
 
-    while (get_op_mode() == TX_MODE){  // attend la fin de l'émission
+    while (get_op_mode() == TX_MODE) { // attend la fin de l'émission
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Attendre 100 ms;
     }
-    
+
     set_standby_mode();
-        
+
     spi->write_reg(REG_FIFO_ADDR_PTR, TX_BASE_ADDR);
     spi->write_reg(REG_PAYLOAD_LENGTH, size);
     spi->write_fifo(REG_FIFO, buf, size);
 
     set_dio0_tx_mapping();
     set_tx_mode();
-    
+
 
 }
 
@@ -126,7 +146,7 @@ void SX1278::send(const std::string &message) {
  */
 void SX1278::continuous_receive() {
 
-    
+
     if (get_op_mode() != STDBY_MODE) {
         set_standby_mode();
     }
@@ -330,15 +350,15 @@ void SX1278::lora_write_fifo(int8_t *buf, int8_t size) {
 /**
  * @brief Calcule la durée d'un symbole en ms
  */
-void SX1278::calculate_tsym(){
-        
+void SX1278::calculate_tsym() {
+
     unsigned BW_VAL[10] = {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000};
 
     unsigned bw_val = BW_VAL[(bw >> 4)];
     unsigned sf_val = sf >> 4;
-    
+
     tsym = (pow(2, sf_val) / bw_val)*1000;
-    
+
 }
 
 /**
@@ -346,10 +366,10 @@ void SX1278::calculate_tsym(){
  * @param payloadLen
  */
 double SX1278::calculate_packet_t(int8_t payloadLen) {
-    
+
     unsigned sf_val = sf >> 4;
     unsigned char ecr_val = 4 + (ecr / 2);
-    
+
     double Tpreambule = (preambleLen + 4.25) * tsym;
     int tmpPoly = (8 * payloadLen - 4 * sf_val + 28 + 16);
     if (tmpPoly < 0) {
@@ -358,9 +378,9 @@ double SX1278::calculate_packet_t(int8_t payloadLen) {
     unsigned payloadSymbNb = 8 + ceil(((double) tmpPoly) / (4 * (sf_val - 2 * (tsym > 16)))) * ecr_val;
     double Tpayload = payloadSymbNb * tsym;
     double Tpacket = Tpayload + Tpreambule;
-    
+
     return Tpacket;
-    
+
 
 }
 
@@ -369,7 +389,7 @@ double SX1278::calculate_packet_t(int8_t payloadLen) {
  */
 void SX1278::set_dio0_rx_mapping() {
     auto value = spi->read_reg(REG_DIO_MAPPING_1);
-    spi->write_reg(REG_DIO_MAPPING_1, value & 0x3f);  // met le bit 7 et 6 à zéro
+    spi->write_reg(REG_DIO_MAPPING_1, value & 0x3f); // met le bit 7 et 6 à zéro
 }
 
 /**
@@ -392,26 +412,26 @@ void SX1278::reset_irq_flags() {
  */
 void SX1278::Done_TX_RX() {
 
-    bool erreurCRC = spi->read_reg(REG_IRQ_FLAGS) & FLAG_CRC;  // lecture du CRC
+    bool erreurCRC = spi->read_reg(REG_IRQ_FLAGS) & FLAG_CRC; // lecture du CRC
     bool rxDone = spi->read_reg(REG_IRQ_FLAGS) & FLAG_RXDONE;
-    
+
     if (rxDone) { // fin de la réception d'un payload 
-              
-        int8_t value = spi->read_reg( REG_FIFO_RX_CURRENT_ADDR );
-        spi->write_reg( REG_FIFO_ADDR_PTR, value );
+
+        int8_t value = spi->read_reg(REG_FIFO_RX_CURRENT_ADDR);
+        spi->write_reg(REG_FIFO_ADDR_PTR, value);
         int8_t rx_nb_bytes = spi->read_reg(REG_RX_NB_BYTES);
         spi->read_fifo(REG_FIFO, bufferRX, rx_nb_bytes);
         bufferRX[rx_nb_bytes] = '\0';
         get_rssi_pkt();
         get_snr();
-               
+
         // appel de la fonction callback définie par l'utilisateur
         if (!erreurCRC & (callback_Rx != nullptr))
             callback_Rx();
-        
+
     }
     if (spi->read_reg(REG_IRQ_FLAGS) & FLAG_TXDONE) { // fin de l'émission d'un payload
-        
+
         set_standby_mode();
         set_dio0_rx_mapping();
         set_rxcont_mode(); // passage en réception continue
@@ -438,25 +458,39 @@ void SX1278::ISR_TX_RX() {
  * @brief  Assignation de l'adresse de la fonction utilisateur
  * @param _ptrFuncRX
  */
-void SX1278::set_callback_RX(void (*ptrFuncRX)(void)){
-   callback_Rx = ptrFuncRX; 
+void SX1278::onRxDone(void (*ptrFuncRX)(void)) {
+    callback_Rx = ptrFuncRX;
 }
 
-void SX1278::set_callback_TX(void (*ptrFuncTX)(void)){
+void SX1278::onTxDone(void (*ptrFuncTX)(void)) {
     callback_Tx = ptrFuncTX;
 }
+
 /**
  * @brief fonction pour obtenir le RSSI du dernier packet reçu
  * @return 
  */
-void SX1278::get_rssi_pkt(){
-   unsigned char value = spi->read_reg(REG_PKT_RSSI_VALUE);
-   rssi = value - (freq < 779E6 ? 164 : 157);     
+void SX1278::get_rssi_pkt() {
+    unsigned char value = spi->read_reg(REG_PKT_RSSI_VALUE);
+    rssi = value - (freq < 779E6 ? 164 : 157);
 }
 
-void SX1278::get_snr(){
+void SX1278::get_snr() {
     snr = spi->read_reg(REG_PKT_SNR_VALUE) * 0.25;
-    
+
+}
+
+int SX1278::packetRssi() {
+    return rssi;
+}
+
+float SX1278::packetSnr() {
+    return snr;
+}
+
+std::string SX1278::payload() {
+    std::string str = (char *) bufferRX; // Conversion implicite
+    return str;
 }
 
 
