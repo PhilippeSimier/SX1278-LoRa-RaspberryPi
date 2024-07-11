@@ -1,7 +1,7 @@
 ﻿# XS1278-LoRa-RaspberryPi
 
 ## It's just for P2P transmissions. Not for LoRaWAN.
-  
+
 May work with all sx127x chips, I didn't test it on these chips
 
 This source uses wiringPi. Installation on raspbian:  
