@@ -3,7 +3,7 @@
  * Author: philippe SIMIER
  * 
  * Programme test unitaire classe SX1278
- * test les 4 méthodes 
+ * test les 2 méthodes continuous_receive() & send() 
  *
  * Created on 7 juillet 2024, 16:14
  */
@@ -15,7 +15,7 @@
 
 using namespace std;
 
-void callback_Rx(void);  // fonction de rappel pour traiter les messages reçus
+void callback_Rx(char* payload, int rssi, float snr);  // fonction de rappel pour traiter les messages reçus
 void callback_Tx(void);  // fonction de rappel packet envoyé
 
 int main(int argc, char** argv) {
@@ -26,16 +26,19 @@ int main(int argc, char** argv) {
     
     try {
       
-        loRa.begin();
+        
         loRa.onRxDone(callback_Rx);
         loRa.onTxDone(callback_Tx);
-        loRa.continuous_receive(); // passsage en mode reception continue
+        loRa.begin();
+        loRa.continuous_receive(); // passage en mode reception continue
         
-        sleep(5);
+        sleep(60);
         loRa.send(buffer, 4);
         loRa.send("Bonjour le monde");
+        loRa.send("Coucou");
         
         while(1){
+            
             sleep(1);
         }     
        
@@ -45,10 +48,17 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void callback_Rx(void) {
-    std::cout << "Rx done : " << loRa.payload();
-    std::cout << " RSSI : " << loRa.packetRssi() << "dBm";
-    std::cout << " SNR  : " << loRa.packetSnr()  << "dB" << std::endl; 
+/**
+ * @brief Callback utilisateur appelé après la reception compléte 
+ *        d'un packet
+ * @param buffer une chaine de caratères char*
+ * @param rssi  le niveau de reception dBm
+ * @param snr   le rapport signal / bruit
+ */
+void callback_Rx(char* payload, int rssi, float snr) {
+    std::cout << "Rx done : " << payload;
+    std::cout << " RSSI : " << rssi << "dBm";
+    std::cout << " SNR  : " << snr  << "dB" << std::endl; 
  
 }
 

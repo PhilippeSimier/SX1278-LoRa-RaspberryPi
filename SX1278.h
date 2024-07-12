@@ -67,8 +67,11 @@
 #define RXCONT_MODE 0x05
 
 #define FLAG_RXDONE 0x40
+#define FLAG_PAYLOAD_CRC_ERROR    0x20
+#define FLAG_VALID_HEADER  0x10
 #define FLAG_TXDONE 0x08
-#define FLAG_CRC    0x20
+#define FLAG_CADDONE 0x04
+#define FLAG_CADDETECTED 0x01
 
 typedef enum BandWidth{
     BW7_8 =0,
@@ -152,13 +155,12 @@ public:
     void send(const std::string &message);
     
     void continuous_receive();
-    void onRxDone(void (*ptrFuncRX)(void));
+    void onRxDone(void (*ptrFuncRX)(char*, int, float));
     void onTxDone(void (*ptrFuncTX)(void));
     
     
     std::string payload();
-    int packetRssi();
-    float packetSnr();
+
     
     
     
@@ -183,7 +185,7 @@ private:
     PowerAmplifireOutputPin powerOutPin; //This chips has to outputs for signal "High power" and regular.
     unsigned char ocp;     //Over Current Protection. 0 to turn OFF. Else reduces current from 45mA to 240mA    
         
-    void (*callback_Rx)(void);  // pointeur sur une fonction callback utilisateur de type void(void)
+    void (*callback_Rx)(char*, int,float);  // pointeur sur une fonction callback utilisateur de type void(char*,int,float)
     void (*callback_Tx)(void);
     
     int rssi;
@@ -230,7 +232,7 @@ private:
     void get_rssi_pkt();
     void get_snr();
     
-    static void ISR_TX_RX();
+    static void interruptHandler();
 };
 
 extern SX1278 loRa;  

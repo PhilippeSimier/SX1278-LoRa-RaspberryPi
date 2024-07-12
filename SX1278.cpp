@@ -67,7 +67,7 @@ void SX1278::begin(double frequency) {
 
     pinMode(gpio_DIO_0, INPUT);
     // appelle de la fonction ISR_Function sur interruption au front montant de DIO_0
-    if (wiringPiISR(gpio_DIO_0, INT_EDGE_RISING, &ISR_TX_RX) < 0) {
+    if (wiringPiISR(gpio_DIO_0, INT_EDGE_RISING, &interruptHandler) < 0) {
         throw std::runtime_error("Exception in begin DIO_0");
     }
 
@@ -101,7 +101,6 @@ void SX1278::begin(double frequency) {
     spi->write_reg(REG_DETECTION_THRESHOLD, 0x0a); //DetectionThreshold for SF > 6
 
     set_freq(freq);
-    set_rxcont_mode(); // passage en réception continue
 }
 
 /**
@@ -111,7 +110,7 @@ void SX1278::begin(double frequency) {
  */
 void SX1278::send(int8_t *buf, int8_t size) {
 
-    while (get_op_mode() == TX_MODE) { // attend la fin de l'émission
+    while (get_op_mode() == TX_MODE) { // attend la fin de l'émission précédente
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Attendre 100 ms;
     }
 
@@ -123,8 +122,6 @@ void SX1278::send(int8_t *buf, int8_t size) {
 
     set_dio0_tx_mapping();
     set_tx_mode();
-
-
 }
 
 /**
@@ -412,8 +409,14 @@ void SX1278::reset_irq_flags() {
  */
 void SX1278::Done_TX_RX() {
 
-    bool erreurCRC = spi->read_reg(REG_IRQ_FLAGS) & FLAG_CRC; // lecture du CRC
-    bool rxDone = spi->read_reg(REG_IRQ_FLAGS) & FLAG_RXDONE;
+    auto value = spi->read_reg(REG_IRQ_FLAGS);
+    spi->write_reg(REG_IRQ_FLAGS, value);
+    
+    
+    bool payloadCrcError = value & FLAG_PAYLOAD_CRC_ERROR; // lecture du CRC
+    bool rxDone = value & FLAG_RXDONE;
+    bool txDone = value & FLAG_TXDONE;
+    bool validHeader = value & FLAG_VALID_HEADER;
 
     if (rxDone) { // fin de la réception d'un payload 
 
@@ -422,15 +425,16 @@ void SX1278::Done_TX_RX() {
         int8_t rx_nb_bytes = spi->read_reg(REG_RX_NB_BYTES);
         spi->read_fifo(REG_FIFO, bufferRX, rx_nb_bytes);
         bufferRX[rx_nb_bytes] = '\0';
-        get_rssi_pkt();
-        get_snr();
+
 
         // appel de la fonction callback définie par l'utilisateur
-        if (!erreurCRC & (callback_Rx != nullptr))
-            callback_Rx();
-
+        if (!payloadCrcError & validHeader & (callback_Rx != nullptr)){
+            get_rssi_pkt();
+            get_snr();
+            callback_Rx((char*) bufferRX, rssi,snr);
+        }
     }
-    if (spi->read_reg(REG_IRQ_FLAGS) & FLAG_TXDONE) { // fin de l'émission d'un payload
+    if (txDone) { // fin de l'émission d'un payload
 
         set_standby_mode();
         set_dio0_rx_mapping();
@@ -439,7 +443,7 @@ void SX1278::Done_TX_RX() {
             callback_Tx();
     }
 
-    reset_irq_flags();
+    
 }
 
 /**
@@ -448,7 +452,7 @@ void SX1278::Done_TX_RX() {
  * Cette fonction est appelée sur interruption émise par le SX1278 
  * elle connecte le signal DIO_0 au slot Done_TX_RX
  */
-void SX1278::ISR_TX_RX() {
+void SX1278::interruptHandler() {
 
     extern SX1278 loRa;
     loRa.Done_TX_RX();
@@ -458,7 +462,7 @@ void SX1278::ISR_TX_RX() {
  * @brief  Assignation de l'adresse de la fonction utilisateur
  * @param _ptrFuncRX
  */
-void SX1278::onRxDone(void (*ptrFuncRX)(void)) {
+void SX1278::onRxDone(void (*ptrFuncRX)(char*, int, float)) {
     callback_Rx = ptrFuncRX;
 }
 
@@ -480,13 +484,7 @@ void SX1278::get_snr() {
 
 }
 
-int SX1278::packetRssi() {
-    return rssi;
-}
 
-float SX1278::packetSnr() {
-    return snr;
-}
 
 std::string SX1278::payload() {
     std::string str = (char *) bufferRX; // Conversion implicite
