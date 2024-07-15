@@ -27,9 +27,8 @@ ocp(240),
 callback_Rx(nullptr),
 callback_Tx(nullptr),
 rssi(0),
-snr(0.0)        
-{
-    std::memset(bufferRX, 0, sizeof(bufferRX));
+snr(0.0) {
+    std::memset(bufferRX, 0, sizeof (bufferRX));
 }
 
 SX1278::~SX1278() {
@@ -115,10 +114,10 @@ void SX1278::send(int8_t *buf, int8_t size) {
     spi->write_reg(REG_FIFO_ADDR_PTR, TX_BASE_ADDR);
     spi->write_reg(REG_PAYLOAD_LENGTH, size);
     spi->write_fifo(REG_FIFO, buf, size);
-    
+
     set_tx_mode();
-    
-    while (get_op_mode() == MODE_TX) {    // waits for transmission to be completed.
+
+    while (get_op_mode() == MODE_TX) { // waits for transmission to be completed.
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
     }
 }
@@ -164,8 +163,10 @@ void SX1278::set_standby_mode() {
 
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
     spi->write_reg(REG_OP_MODE, value | MODE_STDBY);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
 
 }
+
 /**
  * @brief Puts the radio in tx mode.
  */
@@ -176,12 +177,13 @@ void SX1278::set_tx_mode() {
     spi->write_reg(REG_OP_MODE, value | MODE_TX);
 
 }
+
 /**
  * @brief Puts the radio in continuous receive mode.
  */
 void SX1278::set_rxcont_mode() {
 
-    set_dio0_rx_mapping();    
+    set_dio0_rx_mapping();
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
     spi->write_reg(REG_OP_MODE, value | MODE_RXCONT);
 
@@ -411,8 +413,8 @@ void SX1278::Done_TX_RX() {
 
     auto value = spi->read_reg(REG_IRQ_FLAGS);
     spi->write_reg(REG_IRQ_FLAGS, value);
-    
-    
+
+
     bool payloadCrcError = value & FLAG_PAYLOAD_CRC_ERROR; // read the CRC flag
     bool rxDone = value & FLAG_RXDONE;
     bool txDone = value & FLAG_TXDONE;
@@ -428,10 +430,10 @@ void SX1278::Done_TX_RX() {
 
 
         // appel de la fonction callback définie par l'utilisateur
-        if (!payloadCrcError & validHeader & (callback_Rx != nullptr)){
+        if (!payloadCrcError & validHeader & (callback_Rx != nullptr)) {
             get_rssi_pkt();
             get_snr();
-            callback_Rx((char*) bufferRX, rssi,snr);
+            callback_Rx((char*) bufferRX, rssi, snr);
         }
     }
     if (txDone) { // end of payload transmission
@@ -441,7 +443,7 @@ void SX1278::Done_TX_RX() {
         set_rxcont_mode(); // passage en réception continue
         if (callback_Tx != nullptr)
             callback_Tx();
-    }   
+    }
 }
 
 /**
@@ -479,6 +481,57 @@ void SX1278::get_rssi_pkt() {
 void SX1278::get_snr() {
     snr = spi->read_reg(REG_PKT_SNR_VALUE) * 0.25;
 
+}
+
+/**
+ * @brief SX1278::operator<<
+ * @details surcharge de l'opérateur << pour le modificateur endl
+ */
+
+SX1278& SX1278::operator<<(SX1278& (*fp)(SX1278&)) {
+    return (*fp)(*this);
+}
+
+SX1278& SX1278::operator<<(const std::string& message) {
+    bufferTX += message;
+    return *this;
+}
+
+SX1278& SX1278::operator<<(const int value) {
+    bufferTX += std::to_string(value);
+    return *this;
+}
+
+SX1278& SX1278::operator<<(const double value) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2) << value;
+    bufferTX += ss.str();
+    return *this;
+}
+
+SX1278& SX1278::operator<<(const char value) {
+    bufferTX += std::string(1, value);
+    return *this;
+}
+
+SX1278& SX1278::operator<<(const char * value) {
+    bufferTX += std::string(value);
+    return *this;
+}
+
+SX1278& SX1278::operator<<(const bool value) {
+    bufferTX += std::to_string(value);
+    return *this;
+}
+
+SX1278& endl(SX1278& sx) {
+    sx.Endl();
+    return sx;
+}
+
+void SX1278::Endl() {
+    send(bufferTX);
+    bufferTX = "";
 }
 
 

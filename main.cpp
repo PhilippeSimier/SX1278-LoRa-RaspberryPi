@@ -35,7 +35,9 @@ int main(int argc, char** argv) {
         sleep(1);
         loRa.send(buffer, 4);
         loRa.send("Bonjour le monde");
-        loRa.send("Coucou");
+        for (int i = 0; i<10; i++){
+            loRa << "Coucou n° " << i << endl;
+        }
         
         while(1){
             

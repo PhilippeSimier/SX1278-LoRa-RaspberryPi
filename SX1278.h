@@ -16,6 +16,8 @@
 #include <cstring>
 #include <string>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 #include <chrono>
 #include <thread>
 
@@ -73,36 +75,36 @@
 #define FLAG_CADDONE 0x04
 #define FLAG_CADDETECTED 0x01
 
-typedef enum BandWidth{
-    BW7_8 =0,
-    BW10_4 = 1<<4,
-    BW15_6 = 2<<4,
-    BW20_8 = 3<<4,
-    BW31_25 = 4<<4,
-    BW41_7 = 5<<4,
-    BW62_5 = 6<<4,
-    BW125 = 7<<4,
-    BW250 = 8<<4,
-    BW500 = 9<<4,
+typedef enum BandWidth {
+    BW7_8 = 0,
+    BW10_4 = 1 << 4,
+    BW15_6 = 2 << 4,
+    BW20_8 = 3 << 4,
+    BW31_25 = 4 << 4,
+    BW41_7 = 5 << 4,
+    BW62_5 = 6 << 4,
+    BW125 = 7 << 4,
+    BW250 = 8 << 4,
+    BW500 = 9 << 4,
 } BandWidth;
 
-typedef enum SpreadingFactor{
-    SF7 = 7<<4,
-    SF8 = 8<<4,
-    SF9 = 9<<4,
-    SF10 = 10<<4,
-    SF11 = 11<<4,
-    SF12 = 12<<4,
+typedef enum SpreadingFactor {
+    SF7 = 7 << 4,
+    SF8 = 8 << 4,
+    SF9 = 9 << 4,
+    SF10 = 10 << 4,
+    SF11 = 11 << 4,
+    SF12 = 12 << 4,
 } SpreadingFactor;
 
-typedef enum ErrorCodingRate{
-    CR5 = 1<<1,
-    CR6 = 2<<1,
-    CR7 = 3<<1,
-    CR8 = 4<<1,
+typedef enum ErrorCodingRate {
+    CR5 = 1 << 1,
+    CR6 = 2 << 1,
+    CR7 = 3 << 1,
+    CR8 = 4 << 1,
 } ErrorCodingRate;
 
-typedef enum OutputPower{
+typedef enum OutputPower {
     OP0 = 0,
     OP1 = 1,
     OP2 = 2,
@@ -124,12 +126,12 @@ typedef enum OutputPower{
     OP20 = 20,
 } OutputPower;
 
-typedef enum PowerAmplifireOutputPin{
+typedef enum PowerAmplifireOutputPin {
     RFO = 0x70,
     PA_BOOST = 0xf0,
 } PowerAmplifireOutputPin;
 
-typedef enum LnaGain{
+typedef enum LnaGain {
     G1 = 1,
     G2 = 2,
     G3 = 3,
@@ -138,101 +140,112 @@ typedef enum LnaGain{
     G6 = 6,
 } LnaGain;
 
-
-
-
 class SX1278 {
-    
 public:
-    
+
     SX1278();
     SX1278(const SX1278& orig) = delete;
     virtual ~SX1278();
-    
+
     void setPins(int _channel, int _reset, int DIO_0);
     void begin(double frequency = 433775000);
     void send(int8_t *buf, int8_t size);
     void send(const std::string &message);
-    
+
     void continuous_receive();
     void onRxDone(void (*ptrFuncRX)(char*, int, float));
     void onTxDone(void (*ptrFuncTX)(void));
-    
+
     void set_bandwidth(BandWidth bw);
     void set_sf(SpreadingFactor sf);
-    void set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin);    // TX power in dBm, defaults to 20 & PA_BOOST
-    void set_syncw(unsigned char word); 
+    void set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin); // TX power in dBm, defaults to 20 & PA_BOOST
+    void set_syncw(unsigned char word);
     void set_preamble(int preambleLen);
     void set_errorcrc(ErrorCodingRate cr);
-     
+
+    SX1278& operator<<(SX1278& (*)(SX1278&));
+    SX1278& operator<<(const std::string&);
+    SX1278& operator<<(const int);
+    SX1278& operator<<(const double);
+    SX1278& operator<<(const char);
+    SX1278& operator<<(const char *);
+    SX1278& operator<<(const bool);
+
+    void Endl();
+
+
 private:
-    
+
     Spi *spi;
-    int gpio_reset;        //raspberry GPIO pin connected to RESET pin of LoRa chip
-    int gpio_DIO_0;        //raspberry GPIO pin connected to DIO0 pin of LoRa chip to detect TX and Rx done events. 
+    int gpio_reset; //raspberry GPIO pin connected to RESET pin of LoRa chip
+    int gpio_DIO_0; //raspberry GPIO pin connected to DIO0 pin of LoRa chip to detect TX and Rx done events. 
     int channel;
-    
+
     BandWidth bw;
-    SpreadingFactor sf;    //only from SF7 to SF12. SF6 not support yet.
+    SpreadingFactor sf; //only from SF7 to SF12. SF6 not support yet.
     ErrorCodingRate ecr;
-    double freq;           // Frequency in Hz. Example 433775000
-    double tsym;           // temps du symbole
-    
+    double freq; // Frequency in Hz. Example 433775000
+    double tsym; // temps du symbole
+
     unsigned int preambleLen;
     unsigned char syncWord;
-    
+
     OutputPower outPower;
     PowerAmplifireOutputPin powerOutPin; //This chips has to outputs for signal "High power" and regular.
-    unsigned char ocp;     //Over Current Protection. 0 to turn OFF. Else reduces current from 45mA to 240mA    
-        
-    void (*callback_Rx)(char*, int,float);  // pointeur sur une fonction callback utilisateur de type void(char*,int,float)
+    unsigned char ocp; //Over Current Protection. 0 to turn OFF. Else reduces current from 45mA to 240mA    
+
+    void (*callback_Rx)(char*, int, float); // pointeur sur une fonction callback utilisateur de type void(char*,int,float)
     void (*callback_Tx)(void);
-    
+
     int rssi;
     float snr;
-    int8_t bufferRX[257];  // Buffer de réception
-    
-    
+    int8_t bufferRX[257]; // Buffer de réception
+    std::string bufferTX; // Buffer d'émission
+
+
     void reset();
-    
+
     int8_t get_op_mode();
     void set_explicit_header();
-    
+
     void set_crc_on();
     void set_crc_off();
-    
+
     void set_agc(_Bool AGC);
     void set_lna(LnaGain lnaGain, _Bool lnaBoost);
     void set_ocp(unsigned char OCP);
-    
+
     void set_freq(double freq);
-    
+
     void set_lowdatarateoptimize_off();
     void set_lowdatarateoptimize_on();
-    
+
     void lora_write_fifo(int8_t *buf, int8_t size);
-    
+
     void set_lora_mode();
     void set_sleep_mode();
     void set_standby_mode();
     void set_tx_mode();
     void set_rxcont_mode();
-    
+
     void calculate_tsym();
     double calculate_packet_t(int8_t payloadLen);
-    
+
     void set_dio0_rx_mapping();
     void set_dio0_tx_mapping();
     void reset_irq_flags();
     void Done_TX_RX();
-    
+
     void get_rssi_pkt();
     void get_snr();
-    
+
+
+
     static void interruptHandler();
 };
 
-extern SX1278 loRa;  
+SX1278& endl(SX1278& sx);
+extern SX1278 loRa;
 
 #endif /* SX1278_H */
 
