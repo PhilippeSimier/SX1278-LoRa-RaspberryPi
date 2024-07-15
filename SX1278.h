@@ -43,28 +43,28 @@
 #define REG_RSSI_VALUE 0x1B
 #define REG_MODEM_CONFIG_1 0x1D
 #define REG_MODEM_CONFIG_2 0x1E
-#define REG_MODEM_CONFIG_3 0x26
-#define REG_PAYLOAD_LENGTH 0x22
-#define REG_FIFO_RX_BYTE_ADDR 0x25
-#define REG_PA_DAC 0x4d
-#define REG_DIO_MAPPING_1 0x40
-#define REG_DIO_MAPPING_2 0x41
-#define REG_TEMP 0x3c
-#define REG_SYNC_WORD 0x39
 #define REG_PREAMBLE_MSB 0x20
 #define REG_PREAMBLE_LSB 0x21
+#define REG_PAYLOAD_LENGTH 0x22
+#define REG_FIFO_RX_BYTE_ADDR 0x25
+#define REG_MODEM_CONFIG_3 0x26
 #define REG_DETECT_OPTIMIZE 0x31
 #define REG_DETECTION_THRESHOLD 0x37
+#define REG_TEMP 0x3c
+#define REG_SYNC_WORD 0x39
+#define REG_DIO_MAPPING_1 0x40
+#define REG_DIO_MAPPING_2 0x41
+#define REG_PA_DAC 0x4d
+
 
 #define TX_BASE_ADDR 0x00
 #define RX_BASE_ADDR 0x00
 
-#define LORA_MODE 0x80
-
-#define SLEEP_MODE 0x00
-#define STDBY_MODE 0x01
-#define TX_MODE 0x03
-#define RXCONT_MODE 0x05
+#define MODE_LORA 0x80
+#define MODE_SLEEP 0x00
+#define MODE_STDBY 0x01
+#define MODE_TX 0x03
+#define MODE_RXCONT 0x05
 
 #define FLAG_RXDONE 0x40
 #define FLAG_PAYLOAD_CRC_ERROR    0x20
@@ -158,13 +158,13 @@ public:
     void onRxDone(void (*ptrFuncRX)(char*, int, float));
     void onTxDone(void (*ptrFuncTX)(void));
     
-    
-    std::string payload();
-
-    
-    
-    
-    
+    void set_bandwidth(BandWidth bw);
+    void set_sf(SpreadingFactor sf);
+    void set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin);    // TX power in dBm, defaults to 20 & PA_BOOST
+    void set_syncw(unsigned char word); 
+    void set_preamble(int preambleLen);
+    void set_errorcrc(ErrorCodingRate cr);
+     
 private:
     
     Spi *spi;
@@ -192,18 +192,15 @@ private:
     float snr;
     int8_t bufferRX[257];  // Buffer de réception
     
+    
     void reset();
     
     int8_t get_op_mode();
     void set_explicit_header();
-    void set_errorcrc(ErrorCodingRate cr);
+    
     void set_crc_on();
     void set_crc_off();
-    void set_bandwidth(BandWidth bw);
-    void set_sf(SpreadingFactor sf);
-    void set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin);    // OP20 & PA_BOOST
-    void set_syncw(unsigned char word); 
-    void set_preamble(int preambleLen);
+    
     void set_agc(_Bool AGC);
     void set_lna(LnaGain lnaGain, _Bool lnaBoost);
     void set_ocp(unsigned char OCP);

@@ -8,8 +8,7 @@
 #include "SX1278.h"
 
 /**
- * @brief initialise les attributs 
- * @param channel le canal du bus SPI 0 ou 1
+ * @brief The constructor initializes the attributes with default values. 
  */
 SX1278::SX1278() :
 spi(nullptr),
@@ -41,9 +40,9 @@ SX1278::~SX1278() {
 /**
  * @brief  Override the default NSS, RESET, and DIO0 pins used by the class. 
  * Must be called before loRa.begin().
- * @param _channel
- * @param _reset
- * @param DIO_0
+ * @param _channel  new slave select pin to use, defaults to CE0
+ * @param _reset  new reset pin to use, defaults to 0
+ * @param DIO_0  new DIO0 pin to use, defaults to 22.
  */
 void SX1278::setPins(int _channel, int _reset, int DIO_0) {
     channel = _channel;
@@ -104,28 +103,29 @@ void SX1278::begin(double frequency) {
 }
 
 /**
- * @brief méthode pour émettre le contenu d'un buffer
- * @param buf un pointeur sur un buffer d'otects
- * @param size le nombre d'octet du paylaod à émettre
+ * @brief Method to transmit the contents of a buffer
+ *        waits for transmission to be completed.
+ * @param buf a pointer to a buffer of bytes
+ * @param size The number of bytes in the payload to transmit.
  */
 void SX1278::send(int8_t *buf, int8_t size) {
-
-    while (get_op_mode() == TX_MODE) { // attend la fin de l'émission précédente
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Attendre 100 ms;
-    }
 
     set_standby_mode();
 
     spi->write_reg(REG_FIFO_ADDR_PTR, TX_BASE_ADDR);
     spi->write_reg(REG_PAYLOAD_LENGTH, size);
     spi->write_fifo(REG_FIFO, buf, size);
-
-    set_dio0_tx_mapping();
+    
     set_tx_mode();
+    
+    while (get_op_mode() == MODE_TX) {    // waits for transmission to be completed.
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
+    }
 }
 
 /**
- * @brief méthode pour émettre un std::string
+ * @brief Method to transmit the contents of std::string
+ *        waits for transmission to be completed.
  * @param message un std::string
  */
 void SX1278::send(const std::string &message) {
@@ -139,16 +139,15 @@ void SX1278::send(const std::string &message) {
 }
 
 /**
- * Méthode pour passer en mode réception continue
+ * @brief Puts the radio in continuous receive mode.
+ *        default mode is explicit header mode
  */
 void SX1278::continuous_receive() {
 
-
-    if (get_op_mode() != STDBY_MODE) {
+    if (get_op_mode() != MODE_STDBY) {
         set_standby_mode();
     }
 
-    set_dio0_rx_mapping();
     set_rxcont_mode();
 }
 
@@ -158,24 +157,33 @@ int8_t SX1278::get_op_mode() {
 
 }
 
+/**
+ * @brief Puts the radio in standby mode.
+ */
 void SX1278::set_standby_mode() {
 
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
-    spi->write_reg(REG_OP_MODE, value | STDBY_MODE);
+    spi->write_reg(REG_OP_MODE, value | MODE_STDBY);
 
 }
-
+/**
+ * @brief Puts the radio in tx mode.
+ */
 void SX1278::set_tx_mode() {
 
+    set_dio0_tx_mapping();
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
-    spi->write_reg(REG_OP_MODE, value | TX_MODE);
+    spi->write_reg(REG_OP_MODE, value | MODE_TX);
 
 }
-
+/**
+ * @brief Puts the radio in continuous receive mode.
+ */
 void SX1278::set_rxcont_mode() {
 
+    set_dio0_rx_mapping();    
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
-    spi->write_reg(REG_OP_MODE, value | RXCONT_MODE);
+    spi->write_reg(REG_OP_MODE, value | MODE_RXCONT);
 
 }
 
@@ -190,13 +198,13 @@ void SX1278::reset() {
 void SX1278::set_lora_mode() {
     set_sleep_mode();
     int8_t value = spi->read_reg(REG_OP_MODE) & 0x7f;
-    spi->write_reg(REG_OP_MODE, value | LORA_MODE);
+    spi->write_reg(REG_OP_MODE, value | MODE_LORA);
 
 }
 
 void SX1278::set_sleep_mode() {
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
-    spi->write_reg(REG_OP_MODE, value | SLEEP_MODE);
+    spi->write_reg(REG_OP_MODE, value | MODE_SLEEP);
 }
 
 void SX1278::set_explicit_header() {
@@ -336,16 +344,8 @@ void SX1278::set_lowdatarateoptimize_on() {
     spi->write_reg(REG_MODEM_CONFIG_3, value | (0x01 << 3));
 }
 
-void SX1278::lora_write_fifo(int8_t *buf, int8_t size) {
-
-    spi->write_reg(REG_FIFO_ADDR_PTR, TX_BASE_ADDR);
-    spi->write_reg(REG_PAYLOAD_LENGTH, size);
-    spi->write_fifo(REG_FIFO, buf, size);
-
-}
-
 /**
- * @brief Calcule la durée d'un symbole en ms
+ * @brief Calculates the duration of a symbol in ms
  */
 void SX1278::calculate_tsym() {
 
@@ -359,7 +359,7 @@ void SX1278::calculate_tsym() {
 }
 
 /**
- * Calcule la durée pour émettre un paquet
+ * Calculates the duration to transmit a packet
  * @param payloadLen
  */
 double SX1278::calculate_packet_t(int8_t payloadLen) {
@@ -382,7 +382,7 @@ double SX1278::calculate_packet_t(int8_t payloadLen) {
 }
 
 /**
- * Configure la sortie DIO_0 pour le signal RXDone
+ * Configures the DIO_0 output for the RXDone signal
  */
 void SX1278::set_dio0_rx_mapping() {
     auto value = spi->read_reg(REG_DIO_MAPPING_1);
@@ -390,8 +390,8 @@ void SX1278::set_dio0_rx_mapping() {
 }
 
 /**
- * Configure la sortie DIO_0 pour le signal TXDone
- * bit 7 à 0 et bit 6 à 1
+ * Configures the DIO_0 output for the TXDone signal
+ * bit 7 to 0 and bit 6 to 1
  */
 void SX1278::set_dio0_tx_mapping() {
     auto value = spi->read_reg(REG_DIO_MAPPING_1);
@@ -405,7 +405,7 @@ void SX1278::reset_irq_flags() {
 }
 
 /**
- * Méthode exécutée suite à une interruption sur DIO_0
+ * Method executed following an interrupt on DIO_0
  */
 void SX1278::Done_TX_RX() {
 
@@ -413,12 +413,12 @@ void SX1278::Done_TX_RX() {
     spi->write_reg(REG_IRQ_FLAGS, value);
     
     
-    bool payloadCrcError = value & FLAG_PAYLOAD_CRC_ERROR; // lecture du CRC
+    bool payloadCrcError = value & FLAG_PAYLOAD_CRC_ERROR; // read the CRC flag
     bool rxDone = value & FLAG_RXDONE;
     bool txDone = value & FLAG_TXDONE;
     bool validHeader = value & FLAG_VALID_HEADER;
 
-    if (rxDone) { // fin de la réception d'un payload 
+    if (rxDone) { // end of payload reception 
 
         int8_t value = spi->read_reg(REG_FIFO_RX_CURRENT_ADDR);
         spi->write_reg(REG_FIFO_ADDR_PTR, value);
@@ -434,23 +434,20 @@ void SX1278::Done_TX_RX() {
             callback_Rx((char*) bufferRX, rssi,snr);
         }
     }
-    if (txDone) { // fin de l'émission d'un payload
+    if (txDone) { // end of payload transmission
 
         set_standby_mode();
         set_dio0_rx_mapping();
         set_rxcont_mode(); // passage en réception continue
         if (callback_Tx != nullptr)
             callback_Tx();
-    }
-
-    
+    }   
 }
 
 /**
- * Cette fonction est statique 
- * elle  utilise la variable globale loRa pour accéder au contexte 
- * Cette fonction est appelée sur interruption émise par le SX1278 
- * elle connecte le signal DIO_0 au slot Done_TX_RX
+ * This function is static and uses the global variable loRa to access the context. 
+ * This function is called upon an interrupt issued by the SX1278, 
+ * connecting the DIO_0 signal to the Done_TX_RX slot.
  */
 void SX1278::interruptHandler() {
 
@@ -459,7 +456,7 @@ void SX1278::interruptHandler() {
 }
 
 /**
- * @brief  Assignation de l'adresse de la fonction utilisateur
+ * @brief  Assignment of the user function address
  * @param _ptrFuncRX
  */
 void SX1278::onRxDone(void (*ptrFuncRX)(char*, int, float)) {
@@ -471,7 +468,7 @@ void SX1278::onTxDone(void (*ptrFuncTX)(void)) {
 }
 
 /**
- * @brief fonction pour obtenir le RSSI du dernier packet reçu
+ * @brief Function to obtain the RSSI of the last received packet
  * @return 
  */
 void SX1278::get_rssi_pkt() {
@@ -485,15 +482,9 @@ void SX1278::get_snr() {
 }
 
 
-
-std::string SX1278::payload() {
-    std::string str = (char *) bufferRX; // Conversion implicite
-    return str;
-}
-
-
-// déclaration d'une variable globale instance de la classe SX1278
-// Elle permet de donner a la méthode statique ISR_Function 
-// un  accès à l'instance. 
+/**
+ "Declaration of a global variable instance of the SX1278 class.
+  It allows the static method ISR_Function to have access to the instance."
+ */
 SX1278 loRa;
 

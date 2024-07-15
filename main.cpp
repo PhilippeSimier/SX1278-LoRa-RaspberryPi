@@ -1,6 +1,6 @@
 /* 
  * File:   main.cpp
- * Author: philippe SIMIER
+ * Author: philippe SIMIER Lycée Touchard Washington
  * 
  * Programme test unitaire classe SX1278
  * test les 2 méthodes continuous_receive() & send() 
@@ -15,8 +15,8 @@
 
 using namespace std;
 
-void callback_Rx(char* payload, int rssi, float snr);  // fonction de rappel pour traiter les messages reçus
-void callback_Tx(void);  // fonction de rappel packet envoyé
+void callback_Rx(char* payload, int rssi, float snr); // user callback function for when a packet is received. 
+void callback_Tx(void);  // callback function for when a packet is transmited.
 
 int main(int argc, char** argv) {
 
@@ -27,12 +27,12 @@ int main(int argc, char** argv) {
     try {
       
         
-        loRa.onRxDone(callback_Rx);
+        loRa.onRxDone(callback_Rx);  // Register a callback function for when a packet is received.
         loRa.onTxDone(callback_Tx);
         loRa.begin();
-        loRa.continuous_receive(); // passage en mode reception continue
+        loRa.continuous_receive(); // Puts the radio in continuous receive mode.
         
-        sleep(60);
+        sleep(1);
         loRa.send(buffer, 4);
         loRa.send("Bonjour le monde");
         loRa.send("Coucou");
