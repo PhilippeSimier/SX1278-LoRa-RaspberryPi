@@ -138,6 +138,24 @@ void SX1278::send(const std::string &message) {
 }
 
 /**
+ * @brief Method to transmit the contents of bufferTX
+ *        waits for transmission to be completed.
+ */
+void SX1278::send(void) {
+    
+    auto longueur = bufferTX.length();
+    if (longueur > 255) {
+        throw std::runtime_error("Exception in send(char*) SX1278");
+    }
+    send((int8_t *) bufferTX.c_str(), (int8_t) longueur);
+    bufferTX = "";
+}
+
+void SX1278::clear() {
+    bufferTX = "";
+}
+
+/**
  * @brief Puts the radio in continuous receive mode.
  *        default mode is explicit header mode
  */
@@ -524,14 +542,14 @@ SX1278& SX1278::operator<<(const bool value) {
     return *this;
 }
 
-SX1278& endl(SX1278& sx) {
-    sx.Endl();
+SX1278& endPacket(SX1278& sx) {
+    sx.send();
     return sx;
 }
 
-void SX1278::Endl() {
-    send(bufferTX);
-    bufferTX = "";
+SX1278& beginPacket(SX1278& sx) {
+    sx.clear();
+    return sx;
 }
 
 

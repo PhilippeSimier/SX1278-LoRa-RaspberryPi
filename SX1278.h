@@ -149,8 +149,10 @@ public:
 
     void setPins(int _channel, int _reset, int DIO_0);
     void begin(double frequency = 433775000);
+    void send(void);
     void send(int8_t *buf, int8_t size);
     void send(const std::string &message);
+    void clear();
 
     void continuous_receive();
     void onRxDone(void (*ptrFuncRX)(char*, int, float));
@@ -171,7 +173,7 @@ public:
     SX1278& operator<<(const char *);
     SX1278& operator<<(const bool);
 
-    void Endl();
+    
 
 
 private:
@@ -244,7 +246,9 @@ private:
     static void interruptHandler();
 };
 
-SX1278& endl(SX1278& sx);
+SX1278& endPacket(SX1278& sx);
+SX1278& beginPacket(SX1278& sx);
+
 extern SX1278 loRa;
 
 #endif /* SX1278_H */
