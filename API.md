@@ -126,21 +126,7 @@ Puts the radio in continuous receive mode.
 loRa.continuous_receive();
 ```
 
-The `callback_Rx` callback will be called when a packet is received.
 
-```
-
-Returns the averaged RSSI of the last received packet (dBm).
-
-### Packet SNR
-
-```arduino
-float snr = LoRa.packetSnr();
-```
-
-
-
-Returns the next byte in the packet or `-1` if no bytes are available.
 
 
 ## Radio parameters
