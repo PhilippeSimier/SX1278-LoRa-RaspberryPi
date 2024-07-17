@@ -25,7 +25,7 @@
 #define REG_FIFO 0x00
 #define REG_OP_MODE 0x01
 #define REG_FR_MSB 0x06
-#define REG_FR_DIM 0x07
+#define REG_FR_MID 0x07
 #define REG_FR_LSB 0x08
 #define REG_PA_CONFIG 0x09
 #define REG_OCP 0x0B

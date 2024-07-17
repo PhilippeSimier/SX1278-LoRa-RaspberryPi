@@ -116,7 +116,7 @@ void SX1278::send(int8_t *buf, int8_t size) {
     spi->write_fifo(REG_FIFO, buf, size);
 
     set_tx_mode();
-
+     
     while (get_op_mode() == MODE_TX) { // waits for transmission to be completed.
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
     }
@@ -193,7 +193,7 @@ void SX1278::set_tx_mode() {
     set_dio0_tx_mapping();
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
     spi->write_reg(REG_OP_MODE, value | MODE_TX);
-
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
 }
 
 /**
@@ -343,13 +343,10 @@ void SX1278::set_ocp(unsigned char OCP) {
 
 void SX1278::set_freq(double freq) {
 
-    int frf, frf_revers = 0;
-    frf = (int) ceil((freq / (32000000.0))*524288);
-    frf_revers += (int) ((unsigned char) (frf >> 0)) << 16;
-    frf_revers += (int) ((unsigned char) (frf >> 8)) << 8;
-    frf_revers += (int) ((unsigned char) (frf >> 16) << 0);
-    spi->write_fifo(REG_FR_MSB, (int8_t *) & frf_revers, 3);
-
+    uint64_t frf = ((uint64_t)freq << 19) / 32000000;
+    spi->write_reg(REG_FR_MSB, (uint8_t)(frf>>16) );
+    spi->write_reg(REG_FR_MID, (uint8_t)(frf>> 8) );
+    spi->write_reg(REG_FR_LSB, (uint8_t)(frf>> 0) );
 }
 
 void SX1278::set_lowdatarateoptimize_off() {

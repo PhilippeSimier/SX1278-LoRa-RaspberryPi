@@ -22,7 +22,7 @@ class Spi {
     
 public:
     
-    Spi(int channel=0, int speed=32000);
+    Spi(int channel=0, int speed=500000);
     Spi(const Spi& orig) = delete; // L'objet Spi n'est pas clonable
     virtual ~Spi();
     

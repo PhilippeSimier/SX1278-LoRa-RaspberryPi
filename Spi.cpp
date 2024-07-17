@@ -49,7 +49,7 @@ int8_t Spi::read_reg(int8_t reg) {
     int ret;
     unsigned char data[2];
 
-    data[0] = reg;
+    data[0] = reg  & 0x7F; // Bit whr positionné à 0 pour accés en écriture
     data[1] = 0x00;
 
     ret = wiringPiSPIDataRW(channel, data, 2);
@@ -70,7 +70,7 @@ int Spi::write_reg(int8_t reg, int8_t value) {
     int ret;
     unsigned char data[2];
 
-    data[0] = (reg | 0x80); // Bit whr positionné à 1 pour accés en écriture
+    data[0] = reg | 0x80; // Bit whr positionné à 1 pour accés en écriture
     data[1] = value;
 
     ret = wiringPiSPIDataRW(channel, data, 2);

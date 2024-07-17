@@ -7,7 +7,7 @@ CXX = g++
 CXXFLAGS = -Wall -O2 -std=c++11
 
 # Options d'édition de liens
-LDFLAGS = -lwiringPi -lm
+LDFLAGS = -lwiringPi
 
 # Fichiers source
 SOURCES = main.cpp Spi.cpp SX1278.cpp

@@ -32,6 +32,8 @@ cd WiringPi
 It uses continuous mode on module. Radio module will continiuously receive packets and each time execute user callback.
 
 
+# API
+[API.md](API.md)
 
 
 
