@@ -56,6 +56,7 @@
 #define REG_SYNC_WORD 0x39
 #define REG_DIO_MAPPING_1 0x40
 #define REG_DIO_MAPPING_2 0x41
+#define REG_VERSION 0x42
 #define REG_PA_DAC 0x4d
 
 
@@ -75,73 +76,43 @@
 #define FLAG_CADDONE 0x04
 #define FLAG_CADDETECTED 0x01
 
-typedef enum BandWidth {
-    BW7_8 = 0,
-    BW10_4 = 1 << 4,
-    BW15_6 = 2 << 4,
-    BW20_8 = 3 << 4,
-    BW31_25 = 4 << 4,
-    BW41_7 = 5 << 4,
-    BW62_5 = 6 << 4,
-    BW125 = 7 << 4,
-    BW250 = 8 << 4,
-    BW500 = 9 << 4,
-} BandWidth;
-
-typedef enum SpreadingFactor {
-    SF7 = 7 << 4,
-    SF8 = 8 << 4,
-    SF9 = 9 << 4,
-    SF10 = 10 << 4,
-    SF11 = 11 << 4,
-    SF12 = 12 << 4,
-} SpreadingFactor;
-
-typedef enum ErrorCodingRate {
-    CR5 = 1 << 1,
-    CR6 = 2 << 1,
-    CR7 = 3 << 1,
-    CR8 = 4 << 1,
-} ErrorCodingRate;
-
-typedef enum OutputPower {
-    OP0 = 0,
-    OP1 = 1,
-    OP2 = 2,
-    OP3 = 3,
-    OP4 = 4,
-    OP5 = 5,
-    OP6 = 6,
-    OP7 = 7,
-    OP8 = 8,
-    OP9 = 9,
-    OP10 = 10,
-    OP11 = 11,
-    OP12 = 12,
-    OP13 = 13,
-    OP14 = 14,
-    OP15 = 15,
-    OP16 = 16,
-    OP17 = 17,
-    OP20 = 20,
-} OutputPower;
-
-typedef enum PowerAmplifireOutputPin {
-    RFO = 0x70,
-    PA_BOOST = 0xf0,
-} PowerAmplifireOutputPin;
-
-typedef enum LnaGain {
-    G1 = 1,
-    G2 = 2,
-    G3 = 3,
-    G4 = 4,
-    G5 = 5,
-    G6 = 6,
-} LnaGain;
 
 class SX1278 {
 public:
+
+    enum BandWidth {
+        BW7_8 = 0,
+        BW10_4 = 1 << 4,
+        BW15_6 = 2 << 4,
+        BW20_8 = 3 << 4,
+        BW31_25 = 4 << 4,
+        BW41_7 = 5 << 4,
+        BW62_5 = 6 << 4,
+        BW125 = 7 << 4,
+        BW250 = 8 << 4,
+        BW500 = 9 << 4,
+    };
+
+    enum SpreadingFactor {
+        SF7 = 7 << 4,
+        SF8 = 8 << 4,
+        SF9 = 9 << 4,
+        SF10 = 10 << 4,
+        SF11 = 11 << 4,
+        SF12 = 12 << 4,
+    };
+
+    enum ErrorCodingRate {
+        CR5 = 1 << 1,
+        CR6 = 2 << 1,
+        CR7 = 3 << 1,
+        CR8 = 4 << 1,
+    };
+
+    enum PowerAmpPin {
+        RFO = 0x70,
+        PA_BOOST = 0xf0,
+    };
 
     SX1278();
     SX1278(const SX1278& orig) = delete;
@@ -160,10 +131,10 @@ public:
 
     void set_bandwidth(BandWidth bw);
     void set_sf(SpreadingFactor sf);
-    void set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin); // TX power in dBm, defaults to 20 & PA_BOOST
+    void set_tx_power(int8_t power, PowerAmpPin pa_pin); // TX power in dBm, defaults to 20 & PA_BOOST
     void set_syncw(unsigned char word);
     void set_preamble(int preambleLen);
-    void set_errorcrc(ErrorCodingRate cr);
+    void set_ecr(ErrorCodingRate cr);
 
     SX1278& operator<<(SX1278& (*)(SX1278&));
     SX1278& operator<<(const std::string&);
@@ -173,7 +144,12 @@ public:
     SX1278& operator<<(const char *);
     SX1278& operator<<(const bool);
 
+    BandWidth bwFromString(const std::string& str);
+    SpreadingFactor sfFromString(const std::string& str);
+    ErrorCodingRate ecrFromString(const std::string& str);
     
+
+
 
 
 private:
@@ -192,8 +168,8 @@ private:
     unsigned int preambleLen;
     unsigned char syncWord;
 
-    OutputPower outPower;
-    PowerAmplifireOutputPin powerOutPin; //This chips has to outputs for signal "High power" and regular.
+    int8_t outPower;
+    PowerAmpPin powerOutPin; //This chips has to outputs for signal "High power" and regular.
     unsigned char ocp; //Over Current Protection. 0 to turn OFF. Else reduces current from 45mA to 240mA    
 
     void (*callback_Rx)(char*, int, float); // pointeur sur une fonction callback utilisateur de type void(char*,int,float)
@@ -214,7 +190,7 @@ private:
     void set_crc_off();
 
     void set_agc(_Bool AGC);
-    void set_lna(LnaGain lnaGain, _Bool lnaBoost);
+    void set_lna(int8_t lnaGain, _Bool lnaBoost);
     void set_ocp(unsigned char OCP);
 
     void set_freq(double freq);

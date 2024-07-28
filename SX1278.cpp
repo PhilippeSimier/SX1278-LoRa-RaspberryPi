@@ -21,7 +21,7 @@ ecr(CR5),
 freq(433775000),
 preambleLen(6),
 syncWord(0x12),
-outPower(OP20),
+outPower(20),
 powerOutPin(PA_BOOST),
 ocp(240),
 callback_Rx(nullptr),
@@ -57,7 +57,7 @@ void SX1278::begin(double frequency) {
 
     spi = new Spi(channel);
     // Lecture du registre de version 
-    int8_t value = spi->read_reg(0x42);
+    int8_t value = spi->read_reg(REG_VERSION);
     if (value != 0x12) {
         throw std::runtime_error("Exception in begin SX1278");
     }
@@ -74,7 +74,7 @@ void SX1278::begin(double frequency) {
     reset();
     set_lora_mode(); // configure la modulation mode LoRa
     set_explicit_header(); // configure l'entête explicite
-    set_errorcrc(ecr); // configure error coding rate
+    set_ecr(ecr); // configure error coding rate
 
     set_bandwidth(bw); // configure la largeur de bande
     set_sf(sf); // configure le spreading factor
@@ -116,10 +116,9 @@ void SX1278::send(int8_t *buf, int8_t size) {
     spi->write_fifo(REG_FIFO, buf, size);
 
     set_tx_mode();
-     
-    while (get_op_mode() == MODE_TX) { // waits for transmission to be completed.
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
-    }
+    do {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Attendre 100 ms;
+    } while (get_op_mode() == MODE_TX);
 }
 
 /**
@@ -142,7 +141,7 @@ void SX1278::send(const std::string &message) {
  *        waits for transmission to be completed.
  */
 void SX1278::send(void) {
-    
+
     auto longueur = bufferTX.length();
     if (longueur > 255) {
         throw std::runtime_error("Exception in send(char*) SX1278");
@@ -193,7 +192,7 @@ void SX1278::set_tx_mode() {
     set_dio0_tx_mapping();
     int8_t value = spi->read_reg(REG_OP_MODE) & 0xf8;
     spi->write_reg(REG_OP_MODE, value | MODE_TX);
-    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Attendre 10 ms;
+
 }
 
 /**
@@ -232,7 +231,7 @@ void SX1278::set_explicit_header() {
     spi->write_reg(REG_MODEM_CONFIG_1, value);
 }
 
-void SX1278::set_errorcrc(ErrorCodingRate cr) {
+void SX1278::set_ecr(ErrorCodingRate cr) {
     int8_t value = spi->read_reg(REG_MODEM_CONFIG_1) & 0xf1;
     spi->write_reg(REG_MODEM_CONFIG_1, value | cr);
 }
@@ -247,31 +246,32 @@ void SX1278::set_crc_off() {
     spi->write_reg(REG_MODEM_CONFIG_2, value);
 }
 
-void SX1278::set_bandwidth(BandWidth bw) {
+void SX1278::set_bandwidth(BandWidth _bw) {
     int8_t value = spi->read_reg(REG_MODEM_CONFIG_1) & 0x0f;
-    spi->write_reg(REG_MODEM_CONFIG_1, value | bw);
+    spi->write_reg(REG_MODEM_CONFIG_1, value | _bw);
+    bw = _bw;
 }
 
-void SX1278::set_sf(SpreadingFactor sf) {
+void SX1278::set_sf(SpreadingFactor _sf) {
     int8_t value = spi->read_reg(REG_MODEM_CONFIG_2) & 0x0f;
-    spi->write_reg(REG_MODEM_CONFIG_2, value | sf);
-
+    spi->write_reg(REG_MODEM_CONFIG_2, value | _sf);
+    sf = _sf;
 }
 
-void SX1278::set_tx_power(OutputPower power, PowerAmplifireOutputPin pa_pin) {
+void SX1278::set_tx_power(int8_t power, PowerAmpPin pa_pin) {
 
     if (pa_pin == RFO) {
-        power = power >= OP15 ? OP15 : (power <= OP0 ? OP0 : power);
+        power = power >= 15 ? 15 : (power <= 0 ? 0 : power);
         spi->write_reg(REG_PA_DAC, 0x84); //default val to +17dBm
         spi->write_reg(REG_PA_CONFIG, pa_pin | power);
         return;
     } else if (pa_pin == PA_BOOST) {
-        if (power == OP20) {
+        if (power == 20) {
             spi->write_reg(REG_PA_DAC, 0x87); //Max 20dBm power
             spi->write_reg(REG_PA_CONFIG, pa_pin | (power - 2));
             return;
         } else {
-            power = power >= OP17 ? OP17 : (power <= OP2 ? OP2 : power);
+            power = power >= 17 ? 17 : (power <= 2 ? 2 : power);
             spi->write_reg(REG_PA_DAC, 0x84); //default val to +17dBm
             spi->write_reg(REG_PA_CONFIG, pa_pin | (power - 2));
             return;
@@ -305,7 +305,7 @@ void SX1278::set_agc(_Bool AGC) {
 
 }
 
-void SX1278::set_lna(LnaGain lnaGain, _Bool lnaBoost) {
+void SX1278::set_lna(int8_t lnaGain, _Bool lnaBoost) {
 
     spi->write_reg(REG_LNA, ((lnaGain << 5) + lnaBoost));
 
@@ -343,10 +343,10 @@ void SX1278::set_ocp(unsigned char OCP) {
 
 void SX1278::set_freq(double freq) {
 
-    uint64_t frf = ((uint64_t)freq << 19) / 32000000;
-    spi->write_reg(REG_FR_MSB, (uint8_t)(frf>>16) );
-    spi->write_reg(REG_FR_MID, (uint8_t)(frf>> 8) );
-    spi->write_reg(REG_FR_LSB, (uint8_t)(frf>> 0) );
+    uint64_t frf = ((uint64_t) freq << 19) / 32000000;
+    spi->write_reg(REG_FR_MSB, (uint8_t) (frf >> 16));
+    spi->write_reg(REG_FR_MID, (uint8_t) (frf >> 8));
+    spi->write_reg(REG_FR_LSB, (uint8_t) (frf >> 0));
 }
 
 void SX1278::set_lowdatarateoptimize_off() {
@@ -368,7 +368,7 @@ void SX1278::calculate_tsym() {
 
     unsigned BW_VAL[10] = {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000};
 
-    unsigned bw_val = BW_VAL[(bw >> 4)];
+    unsigned bw_val = BW_VAL[((int8_t) bw >> 4)];
     unsigned sf_val = sf >> 4;
 
     tsym = (pow(2, sf_val) / bw_val)*1000;
@@ -547,6 +547,38 @@ SX1278& endPacket(SX1278& sx) {
 SX1278& beginPacket(SX1278& sx) {
     sx.clear();
     return sx;
+}
+
+SX1278::BandWidth SX1278::bwFromString(const std::string& str) {
+    if (str == "BW7_8") return BW7_8;
+    if (str == "BW10_4") return BW10_4;
+    if (str == "BW15_6") return BW15_6;
+    if (str == "BW20_8") return BW20_8;
+    if (str == "BW31_25") return BW31_25;
+    if (str == "BW41_7") return BW41_7;
+    if (str == "BW62_5") return BW62_5;
+    if (str == "BW125") return BW125;
+    if (str == "BW250") return BW250;
+    if (str == "BW500") return BW500;
+    throw std::invalid_argument("Invalid BW String");
+}
+
+SX1278::SpreadingFactor SX1278::sfFromString(const std::string& str) {
+    if (str == "SF7") return SF7;
+    if (str == "SF8") return SF8;
+    if (str == "SF9") return SF9;
+    if (str == "SF10") return SF10;
+    if (str == "SF11") return SF11;
+    if (str == "SF12") return SF12;
+    throw std::invalid_argument("Invalid SF String");
+}
+
+SX1278::ErrorCodingRate SX1278::ecrFromString(const std::string& str) {
+    if (str == "CR5") return CR5;
+    if (str == "CR6") return CR6;
+    if (str == "CR7") return CR7;
+    if (str == "CR8") return CR8;
+    throw std::invalid_argument("Invalid ECR String");
 }
 
 
