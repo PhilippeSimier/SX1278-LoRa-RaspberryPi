@@ -77,7 +77,7 @@ void SX1278::begin(double frequency) {
     set_ecr(ecr); // configure error coding rate
 
     set_bandwidth(bw); // configure la largeur de bande
-    set_sf(sf); // configure le spreading factor
+    
     set_crc_on();
     set_tx_power(outPower, powerOutPin);
     set_syncw(syncWord);
@@ -85,20 +85,12 @@ void SX1278::begin(double frequency) {
     set_agc(1); // On/Off AGC. If AGC is on, LNAGain not used
     //set_lna(G6, 0); // à creuser !!!
     set_ocp(ocp); // 45 to 240 mA. 0 to turn off protection
-    calculate_tsym(); // calcul du temps de symbole
-
-    if ((tsym > 16))
-        set_lowdatarateoptimize_on();
-    else
-        set_lowdatarateoptimize_off();
 
     spi->write_reg(REG_FIFO_TX_BASE_ADDR, TX_BASE_ADDR);
     spi->write_reg(REG_FIFO_RX_BASE_ADDR, RX_BASE_ADDR);
 
-    spi->write_reg(REG_DETECT_OPTIMIZE, 0xc3); //LoRa Detection Optimize for SF > 6
-    spi->write_reg(REG_DETECTION_THRESHOLD, 0x0a); //DetectionThreshold for SF > 6
-
     set_freq(freq);
+    set_sf(sf); // configure le spreading factor
 }
 
 /**
@@ -253,9 +245,28 @@ void SX1278::set_bandwidth(BandWidth _bw) {
 }
 
 void SX1278::set_sf(SpreadingFactor _sf) {
+
+    if (_sf == SF6) {
+        spi->write_reg(REG_DETECT_OPTIMIZE, 0xc5); //LoRa Detection Optimize for SF6
+        spi->write_reg(REG_DETECTION_THRESHOLD, 0x0c); //DetectionThreshold for SF6
+
+    } else {
+        spi->write_reg(REG_DETECT_OPTIMIZE, 0xc3); //LoRa Detection Optimize for SF > 6
+        spi->write_reg(REG_DETECTION_THRESHOLD, 0x0a); //DetectionThreshold for SF > 6
+    }
+
+
     int8_t value = spi->read_reg(REG_MODEM_CONFIG_2) & 0x0f;
-    spi->write_reg(REG_MODEM_CONFIG_2, value | _sf);
+    spi->write_reg(REG_MODEM_CONFIG_2, value | ((_sf << 4) & 0xf0));
     sf = _sf;
+
+    calculate_tsym(); // calcul du temps de symbole
+
+    if ((tsym > 16))
+        set_lowdatarateoptimize_on();
+    else
+        set_lowdatarateoptimize_off();
+
 }
 
 void SX1278::set_tx_power(int8_t power, PowerAmpPin pa_pin) {
@@ -369,33 +380,9 @@ void SX1278::calculate_tsym() {
     unsigned BW_VAL[10] = {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000};
 
     unsigned bw_val = BW_VAL[((int8_t) bw >> 4)];
-    unsigned sf_val = sf >> 4;
+    unsigned sf_val = sf;
 
-    tsym = (pow(2, sf_val) / bw_val)*1000;
-
-}
-
-/**
- * Calculates the duration to transmit a packet
- * @param payloadLen
- */
-double SX1278::calculate_packet_t(int8_t payloadLen) {
-
-    unsigned sf_val = sf >> 4;
-    unsigned char ecr_val = 4 + (ecr / 2);
-
-    double Tpreambule = (preambleLen + 4.25) * tsym;
-    int tmpPoly = (8 * payloadLen - 4 * sf_val + 28 + 16);
-    if (tmpPoly < 0) {
-        tmpPoly = 0;
-    }
-    unsigned payloadSymbNb = 8 + ceil(((double) tmpPoly) / (4 * (sf_val - 2 * (tsym > 16)))) * ecr_val;
-    double Tpayload = payloadSymbNb * tsym;
-    double Tpacket = Tpayload + Tpreambule;
-
-    return Tpacket;
-
-
+    tsym = 1000 / (bw_val / (1L << sf_val));
 }
 
 /**
@@ -564,6 +551,7 @@ SX1278::BandWidth SX1278::bwFromString(const std::string& str) {
 }
 
 SX1278::SpreadingFactor SX1278::sfFromString(const std::string& str) {
+    if (str == "SF6") return SF6;
     if (str == "SF7") return SF7;
     if (str == "SF8") return SF8;
     if (str == "SF9") return SF9;

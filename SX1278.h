@@ -11,7 +11,6 @@
 #include "Spi.h"
 #include <unistd.h>
 #include <stdbool.h>
-#include <math.h>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -68,6 +67,7 @@
 #define MODE_STDBY 0x01
 #define MODE_TX 0x03
 #define MODE_RXCONT 0x05
+#define MODE_RXSINGLE 0x06
 
 #define FLAG_RXDONE 0x40
 #define FLAG_PAYLOAD_CRC_ERROR    0x20
@@ -94,12 +94,13 @@ public:
     };
 
     enum SpreadingFactor {
-        SF7 = 7 << 4,
-        SF8 = 8 << 4,
-        SF9 = 9 << 4,
-        SF10 = 10 << 4,
-        SF11 = 11 << 4,
-        SF12 = 12 << 4,
+        SF6 = 6,
+        SF7 = 7,
+        SF8 = 8,
+        SF9 = 9,
+        SF10 = 10,
+        SF11 = 11,
+        SF12 = 12,
     };
 
     enum ErrorCodingRate {
@@ -163,7 +164,7 @@ private:
     SpreadingFactor sf; //only from SF7 to SF12. SF6 not support yet.
     ErrorCodingRate ecr;
     double freq; // Frequency in Hz. Example 433775000
-    double tsym; // temps du symbole
+    long tsym;   // durée du symbole en ms
 
     unsigned int preambleLen;
     unsigned char syncWord;
@@ -207,8 +208,7 @@ private:
     void set_rxcont_mode();
 
     void calculate_tsym();
-    double calculate_packet_t(int8_t payloadLen);
-
+    
     void set_dio0_rx_mapping();
     void set_dio0_tx_mapping();
     void reset_irq_flags();
@@ -216,8 +216,6 @@ private:
 
     void get_rssi_pkt();
     void get_snr();
-
-
 
     static void interruptHandler();
 };
