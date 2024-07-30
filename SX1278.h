@@ -81,26 +81,26 @@ class SX1278 {
 public:
 
     enum BandWidth {
-        BW7_8 = 0,
-        BW10_4 = 1 << 4,
-        BW15_6 = 2 << 4,
-        BW20_8 = 3 << 4,
-        BW31_25 = 4 << 4,
-        BW41_7 = 5 << 4,
-        BW62_5 = 6 << 4,
-        BW125 = 7 << 4,
-        BW250 = 8 << 4,
-        BW500 = 9 << 4,
+        BW7_8,
+        BW10_4,
+        BW15_6,
+        BW20_8,
+        BW31_25,
+        BW41_7,
+        BW62_5,
+        BW125,
+        BW250,
+        BW500,
     };
 
     enum SpreadingFactor {
         SF6 = 6,
-        SF7 = 7,
-        SF8 = 8,
-        SF9 = 9,
-        SF10 = 10,
-        SF11 = 11,
-        SF12 = 12,
+        SF7,
+        SF8,
+        SF9,
+        SF10,
+        SF11,
+        SF12,
     };
 
     enum ErrorCodingRate {

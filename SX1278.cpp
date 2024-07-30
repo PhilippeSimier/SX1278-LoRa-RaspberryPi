@@ -240,7 +240,7 @@ void SX1278::set_crc_off() {
 
 void SX1278::set_bandwidth(BandWidth _bw) {
     int8_t value = spi->read_reg(REG_MODEM_CONFIG_1) & 0x0f;
-    spi->write_reg(REG_MODEM_CONFIG_1, value | _bw);
+    spi->write_reg(REG_MODEM_CONFIG_1, value | _bw << 4);
     bw = _bw;
 }
 
@@ -379,7 +379,7 @@ void SX1278::calculate_tsym() {
 
     unsigned BW_VAL[10] = {7800, 10400, 15600, 20800, 31250, 41700, 62500, 125000, 250000, 500000};
 
-    unsigned bw_val = BW_VAL[((int8_t) bw >> 4)];
+    unsigned bw_val = BW_VAL[((int8_t) bw)];
     unsigned sf_val = sf;
 
     tsym = 1000 / (bw_val / (1L << sf_val));
