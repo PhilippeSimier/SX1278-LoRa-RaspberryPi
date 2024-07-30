@@ -550,6 +550,26 @@ SX1278::BandWidth SX1278::bwFromString(const std::string& str) {
     throw std::invalid_argument("Invalid BW String");
 }
 
+/**
+ * 
+ * @param val double Bandwidth Khz
+ * @return SX1278::BandWidth
+ */
+SX1278::BandWidth SX1278::bwFromDouble(const double val) {
+    if (val == 7.8) return BW7_8;
+    if (val == 10.4) return BW10_4;
+    if (val == 15.6) return BW15_6;
+    if (val == 20.8) return BW20_8;
+    if (val == 31.2) return BW31_25;
+    if (val == 41.7) return BW41_7;
+    if (val == 62.5) return BW62_5;
+    if (val == 125) return BW125;
+    if (val == 250) return BW250;
+    if (val == 500) return BW500;
+    throw std::invalid_argument("Invalid BW double");
+    
+}
+
 SX1278::SpreadingFactor SX1278::sfFromString(const std::string& str) {
     if (str == "SF6") return SF6;
     if (str == "SF7") return SF7;

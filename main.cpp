@@ -28,8 +28,7 @@ int main(int argc, char** argv) {
         
         loRa.onRxDone(callback_Rx);  // Register a user callback function 
         loRa.onTxDone(callback_Tx);  // Register a user callback function
-        loRa.begin();                // settings the radio
-        //loRa.set_sf(SX1278::SF12);
+        loRa.begin();                // settings the radio     
         loRa.continuous_receive();   // Puts the radio in continuous receive mode.
         
         sleep(1);

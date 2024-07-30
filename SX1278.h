@@ -146,6 +146,7 @@ public:
     SX1278& operator<<(const bool);
 
     BandWidth bwFromString(const std::string& str);
+    BandWidth bwFromDouble(const double val);
     SpreadingFactor sfFromString(const std::string& str);
     ErrorCodingRate ecrFromString(const std::string& str);
     
