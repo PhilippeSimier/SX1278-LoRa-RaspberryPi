@@ -6,9 +6,15 @@ May work with all sx127x chips, I didn't test it on these chips
 
 This source uses wiringPi. Installation on raspbian:  
 ```
+apt install git
 git clone https://github.com/WiringPi/WiringPi.git
 cd WiringPi
 ./build
+```
+
+Vérifier la version
+```
+gpio -v
 ```
 1. Wire raspberry and lora chip by the table below
 
