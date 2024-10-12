@@ -1,4 +1,4 @@
-﻿# XS1278-LoRa-RaspberryPi
+﻿# SX1278-LoRa-RaspberryPi
 
 ## It's just for P2P transmissions. Not for LoRaWAN.
 
